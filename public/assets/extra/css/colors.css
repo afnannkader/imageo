@@ -1,0 +1,12 @@
+
+        :root {
+            --primaryColor: #8F37FF;
+            --secondaryColor: #641BC0;
+            --thirdColor: #0F0B1D;
+            --bgColor: #FAFBFF;
+            --darkModePrimaryColor: #0F0B1D;
+            --darkModeSecondaryColor:  #1E1439;
+            --darkModeThirdColor: #2A1B45;
+            --darkModeBgColor: #0F0B1D;
+        }
+        
