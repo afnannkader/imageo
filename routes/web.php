@@ -107,6 +107,12 @@ Route::group(localizeOptions(), function () {
                 Route::get('download/{id}/{name}', 'ImageController@download')->name('download');
             });
 
+            // Image-to-Image (Nano Banana and future engines)
+            Route::name('image2image.')->prefix('image-to-image')->group(function () {
+                Route::get('/', 'ImageToImageController@index')->name('index');
+                Route::post('generate', 'ImageToImageController@generate')->name('generate');
+            });
+
             Route::get('features', 'GlobalController@features')->name('features')->middleware('disable.features');
 
             Route::get('pricing', 'GlobalController@pricing')->name('pricing');
