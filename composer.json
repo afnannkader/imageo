@@ -15,7 +15,7 @@
         "guzzlehttp/guzzle": "^7.2",
         "guzzlehttp/psr7": "^2.4",
         "hashids/hashids": "^5.0",
-        "intervention/image": "2.7",
+        "intervention/image": "^3.11",
         "jenssegers/date": "^4.0",
         "laravel/framework": "^10.10",
         "laravel/sanctum": "^3.2",

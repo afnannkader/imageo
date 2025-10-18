@@ -11,4 +11,5 @@ return array (
   'are_you_sure' => 'Are you sure?',
   'view_image' => 'View Image',
   'cron_job_executed_successfully' => 'Cron Job executed successfully',
+  'generate' => 'Generate',
 );

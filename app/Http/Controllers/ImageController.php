@@ -10,6 +10,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+
+use Exception;
+
 
 class ImageController extends Controller
 {
@@ -33,25 +37,37 @@ class ImageController extends Controller
     public function generator(Request $request)
     {
         $ip = ipInfo()->ip;
+        Log::info('Image generation started for text to image', ['ip' => $ip, 'request_data' => $request->all()]);
 
         if (demoMode()) {
+            Log::warning('Demo mode active — image generation blocked');
             return jsonError(admin_lang('This version is for demo purpose, generating images are not allowed.'));
         }
 
         if (!subscription()->is_subscribed) {
+            Log::warning('User not subscribed');
             return jsonError(lang('You need to have an active subscription to start generating the images', 'home page'));
         }
 
         $engine = engine($request->engine);
+        Log::info('Engine lookup result for text to image engine', [
+            'engine_type' => gettype($engine),
+            'engine_value' => $engine,
+        ]);
         if (!$engine) {
+            Log::error('Engine not found or inactive', ['engine' => $request->engine]);
             return jsonError(lang('The selected engine is not active', 'home page'));
         }
 
+
         $storageProvider = StorageProvider::where('alias', env('FILESYSTEM_DRIVER'))->first();
         if (!$storageProvider) {
+            Log::error('Storage provider not found for text to image ', ['driver' => env('FILESYSTEM_DRIVER')]);
+
             return jsonError(lang('Storage provider error', 'home page'));
         }
 
+        Log::info('Validator initialized for text to image');
         $validator = Validator::make($request->all(), [
             'prompt' => ['required', 'string'],
             'engine' => ['required', 'string'],
@@ -65,6 +81,7 @@ class ImageController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::error('Validation failed', ['errors' => $validator->errors()->all()]);
             foreach ($validator->errors()->all() as $error) {
                 return jsonError($error);
             }
@@ -115,13 +132,19 @@ class ImageController extends Controller
         }
 
         try {
-            $handler = new $engine->handler;
 
+            Log::info('Before instantiating handler for text to image ', ['handler_class' => $engine->handler]);
+            $handler = new $engine->handler;
+            Log::info('Handler instantiated for text to image');
             $generatedImages = $handler->process($engine, $prompt, $request->negative_prompt, $request->size, $request->samples, $storageProvider);
+
+            Log::info('Handler process returned for teext to image', [
+                'generated_images' => $generatedImages,
+            ]);
             if (!is_array($generatedImages)) {
                 return jsonError($generatedImages);
             }
-            Log::info($generatedImages);
+
 
             $images = [];
             foreach ($generatedImages as $key => $image) {
@@ -156,9 +179,10 @@ class ImageController extends Controller
                     $images[$key]['download_link'] = route('images.download', [hashid($generatedImage->id), $generatedImage->getMainImageName()]);
                 }
             }
-
+            Log::info('All generated images saved successfully for text to image');
             return response()->json(['images' => $images]);
         } catch (Exception $e) {
+            Log::error('Error during image generation', ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return jsonError($e->getMessage());
         }
     }
@@ -215,4 +239,156 @@ class ImageController extends Controller
         }
         return false;
     }
+
+    public function imageToImagePage()
+    {
+        $engines = \App\Models\Engine::where('alias', 'nano-banana')->active()->get();
+        return view('images.i2i', compact('engines'));
+    }
+
+    public function imageToImageGenerate(Request $request)
+    {
+        Log::info('✅ Entered imageToImageGenerate', ['input' => $request->all()]);
+
+        $ip = ipInfo()->ip;
+
+        if (demoMode()) {
+            Log::warning('Demo mode active — image generation blocked');
+            return jsonError(admin_lang('This version is for demo purpose, generating images are not allowed.'));
+        }
+
+        if (!subscription()->is_subscribed) {
+            Log::warning('User not subscribed');
+            return jsonError(lang('You need to have an active subscription to start generating the images', 'home page'));
+        }
+
+        $engine = engine($request->engine);
+        Log::info('Engine lookup result', [
+            'engine_type' => gettype($engine),
+            'engine_value' => $engine,
+        ]);
+        if (!$engine) {
+            Log::error('Engine not found or inactive', ['engine' => $request->engine]);
+            return jsonError(lang('The selected engine is not active', 'home page'));
+        }
+
+        $sizes = $engine->sizes ?? '["1024x1024"]'; // default
+        $sizesArray = json_decode($sizes, true);
+        if (!is_array($sizesArray) || empty($sizesArray)) {
+            $sizesArray = ['1024x1024'];
+        }
+        $sizesArray = array_map(function ($s) {
+            return trim(str_replace('"', '', $s));
+        }, $sizesArray);
+
+
+        $storageProvider = \App\Models\StorageProvider::where('alias', env('FILESYSTEM_DRIVER'))->first();
+        if (!$storageProvider) {
+            Log::error('Storage provider not found', ['driver' => env('FILESYSTEM_DRIVER')]);
+            return jsonError(lang('Storage provider error', 'home page'));
+        }
+
+        Log::info('Validator initialized');
+        $validator = Validator::make($request->all(), [
+            'prompt' => ['required', 'string'],
+            'engine' => ['required', 'string'],
+            'image' => ['required', 'image', 'mimes:jpg,png,jpeg', 'max:10240'],
+            'size' => ['required', Rule::in($sizesArray)],
+            'samples' => ['required', 'integer', 'min:1', 'max:' . min($engine->max, subscription()->plan->max_images)],
+            'visibility' => ['sometimes', 'integer', 'min:0', 'max:1'],
+        ]);
+
+        if ($validator->fails()) {
+            Log::error('Validation failed', ['errors' => $validator->errors()->all()]);
+            foreach ($validator->errors()->all() as $error) {
+                return jsonError($error);
+            }
+        }
+
+        if (!in_array($engine->id, subscription()->plan->engines)) {
+            return jsonError(lang('Invalid engine', 'home page'));
+        }
+
+        if (subscription()->remaining_images < $request->samples) {
+            if (Auth::user()) {
+                return jsonError(lang('You have exceeded the limit, please upgrade your plan', 'home page'));
+            } else {
+                return jsonError(lang('You have exceeded the limit, please register', 'home page'));
+            }
+        }
+
+        if (subscription()->plan->expiration) {
+            $expiryAt = Carbon::now()->addDays(subscription()->plan->expiration);
+        } else {
+            $expiryAt = null;
+        }
+
+        $uploadedImage = $request->file('image');
+
+        try {
+            Log::info('Before instantiating handler', ['handler_class' => $engine->handler]);
+            $handler = new $engine->handler;
+            Log::info('Handler instantiated');
+
+            $generatedImages = $handler->process(
+                $engine,
+                $uploadedImage,   
+                $request->prompt, 
+                null,
+                $request->size,
+                $request->samples,
+                $storageProvider
+            );
+
+
+            Log::info('Handler process returned', ['generated_images' => $generatedImages]);
+
+            if (!is_array($generatedImages)) {
+                return jsonError($generatedImages);
+            }
+
+            $images = [];
+            foreach ($generatedImages as $key => $image) {
+                $userId = authUser() ? authUser()->id : null;
+                $request->visibility = !$userId ? 1 : $request->visibility;
+
+                $generatedImage = \App\Models\GeneratedImage::create([
+                    'user_id' => $userId,
+                    'storage_provider_id' => $storageProvider->id,
+                    'engine_id' => $engine->id,
+                    'ip_address' => $ip,
+                    'prompt' => $request->prompt,
+                    'negative_prompt' => null,
+                    'size' => $request->size,
+                    'art_style' => null,
+                    'lightning_style' => null,
+                    'mood' => null,
+                    'main' => $image['main'],
+                    'thumbnail' => $image['thumbnail'],
+                    'expiry_at' => $expiryAt,
+                    'visibility' => $request->visibility,
+                ]);
+
+                if ($generatedImage) {
+                    if (Auth::user()) {
+                        Auth::user()->subscription->increment('generated_images');
+                    }
+
+                    $images[$key]['prompt'] = $generatedImage->prompt;
+                    $images[$key]['src'] = $generatedImage->getThumbnailLink();
+                    $images[$key]['link'] = route('images.show', hashid($generatedImage->id));
+                    $images[$key]['download_link'] = route('images.download', [hashid($generatedImage->id), $generatedImage->getMainImageName()]);
+                }
+            }
+
+            Log::info('All generated images saved successfully');
+            return response()->json(['images' => $images]);
+
+        } catch (Exception $e) {
+            Log::error('Error during image-to-image generation', ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return jsonError($e->getMessage());
+        }
+    }
+
+
 }

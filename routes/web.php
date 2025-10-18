@@ -103,8 +103,12 @@ Route::group(localizeOptions(), function () {
             Route::name('images.')->prefix('images')->group(function () {
                 Route::get('/explore', 'ImageController@index')->name('index');
                 Route::post('generate', 'ImageController@generator')->name('generator');
+                Route::get('image-to-image', 'ImageController@imageToImagePage')->name('image_to_image');
+                Route::post('image-to-image/generate', 'ImageController@imageToImageGenerate')->name('image_to_image.generate');
+
                 Route::get('{id}/view', 'ImageController@show')->name('show');
                 Route::get('download/{id}/{name}', 'ImageController@download')->name('download');
+
             });
 
             Route::get('features', 'GlobalController@features')->name('features')->middleware('disable.features');
@@ -133,6 +137,7 @@ Route::group(localizeOptions(), function () {
             }
 
             Route::get('{slug}', 'GlobalController@page')->name('page');
+
         });
     });
 });

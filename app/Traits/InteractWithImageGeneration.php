@@ -6,6 +6,8 @@ use App\Methods\ImageToWebp;
 use App\Traits\InteractWithFileStorage;
 use GuzzleHttp\Client;
 use Intervention\Image\Facades\Image;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 trait InteractWithImageGeneration
 {
@@ -43,7 +45,7 @@ trait InteractWithImageGeneration
 
     public function uploadImageResources($data, $storageProvider)
     {
-        $handler = new $storageProvider->handler;   
+        $handler = new $storageProvider->handler;
 
         $response = [];
 
@@ -114,14 +116,46 @@ trait InteractWithImageGeneration
         return $image;
     }
 
-    protected function downloadImage($imageUrl)
-    {
-        sleep(10);
 
+
+  protected function downloadImage($url)
+{
+    try {
+        // Fetch image content
         $client = new Client();
-        $response = $client->get($imageUrl);
+        $response = $client->get($url);
+        $content = $response->getBody()->getContents();
 
-        return $response->getBody();
+        // Generate unique filename with correct extension
+        $extension = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
+   $filename = Str::random(15) . '_' . time() . '.' . $extension;
+
+        $path = 'generation/images/' . $filename;
+
+        // Ensure directory exists
+        $directory = public_path('generation/images');
+        if (!file_exists($directory)) {
+            mkdir($directory, 0777, true);
+        }
+
+        // Save image
+        $fullPath = public_path($path);
+        $result = file_put_contents($fullPath, $content);
+
+        if ($result === false) {
+            Log::error('Failed to save image', ['path' => $fullPath]);
+            return null;
+        }
+
+        Log::info('Image saved successfully', ['path' => $fullPath]);
+        return $path;
+
+    } catch (\Exception $e) {
+        Log::error('Error downloading image', ['message' => $e->getMessage(), 'url' => $url]);
+        return null;
     }
+}
+
+
 
 }
