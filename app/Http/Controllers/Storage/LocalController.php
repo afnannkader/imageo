@@ -13,7 +13,7 @@ class LocalController extends Controller
 
     public function __construct()
     {
-        $this->disk = Storage::disk('direct');
+        $this->disk = Storage::disk('public');
     }
 
     public function upload($file, $path, $converted = false)
@@ -25,7 +25,7 @@ class LocalController extends Controller
             return $this->response([
                 'filename' => $filename,
                 'path' => $path,
-                'url' => url($path),
+                'url' => $this->disk->url($path),
             ]);
         } catch (Exception $e) {
             throw new Exception($e->getMessage());

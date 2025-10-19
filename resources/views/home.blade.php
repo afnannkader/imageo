@@ -15,17 +15,21 @@
                         </div>
                         @if (subscription())
                             @if (subscription()->is_subscribed)
-                                <form id="generator" action="{{ route('images.generator') }}" method="POST">
+                                <form id="generator" action="{{ route('images.generator') }}" method="POST" enctype="multipart/form-data">
                                     <div class="card-v mt-5">
                                         <div class="generator-search v2">
                                             @if ($engines && $engines->count() > 0)
+                                                {{-- Main prompt input area --}}
                                                 <div class="row g-3">
-                                                    <div class="col-lg-8">
-                                                        <input type="text" name="prompt"
-                                                            class="form-control prompt-input"
+                                                    <div class="col-12">
+                                                        <textarea name="prompt" class="form-control prompt-input" rows="3"
                                                             placeholder="{{ lang('What do you want to generate?', 'home page') }}"
-                                                            value="{{ request('prompt') ?? '' }}" autofocus required />
+                                                            value="{{ request('prompt') ?? '' }}" autofocus required></textarea>
                                                     </div>
+                                                </div>
+                                                
+                                                {{-- Options and Generate buttons --}}
+                                                <div class="row g-3 mt-2">
                                                     <div class="col col-lg-2">
                                                         <button type="button" id="generator-options-btn"
                                                             class="btn btn-light px-4 w-100"><i
@@ -38,6 +42,41 @@
                                                 </div>
                                                 <div class="generator-options d-none">
                                                     <div class="row g-3">
+                                                        {{-- Image-to-Image Mode Toggle --}}
+                                                        <div class="col-12">
+                                                            <div class="row g-2 g-lg-3 align-items-center">
+                                                                <div class="col-12 col-lg-3">
+                                                                    <label class="col-form-label">
+                                                                        {{ lang('Generation Mode', 'home page') }}
+                                                                    </label>
+                                                                </div>
+                                                                <div class="col">
+                                                                    <div class="form-check">
+                                                                        <input class="form-check-input" type="checkbox" id="imageToImageMode" name="image_to_image_mode">
+                                                                        <label class="form-check-label" for="imageToImageMode">
+                                                                            {{ lang('Image to Image', 'images') }}
+                                                                        </label>
+                                                                    </div>
+                                                                    <small class="text-muted">{{ lang('Upload images to transform them with AI', 'images') }}</small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        {{-- Image Upload Section (Hidden by default) --}}
+                                                        <div class="col-12 d-none" id="imageUploadSection">
+                                                            <div class="row g-2 g-lg-3 align-items-center">
+                                                                <div class="col-12 col-lg-3">
+                                                                    <label class="col-form-label">
+                                                                        {{ lang('Input Images', 'images') }}
+                                                                    </label>
+                                                                </div>
+                                                                <div class="col">
+                                                                    <input type="file" class="form-control" name="images[]" accept="image/*" multiple />
+                                                                    <small class="text-muted">{{ lang('Supported: jpg, jpeg, png, webp. Max 5MB each.', 'images') }}</small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
                                                         <div class="col-12">
                                                             <div class="row g-2 g-lg-3 align-items-center">
                                                                 <div class="col-12 col-lg-3">
@@ -69,6 +108,10 @@
                                                                                 {{ $engine->name }}
                                                                             </option>
                                                                         @endforeach
+                                                                        {{-- Add Nano Banana option for image-to-image --}}
+                                                                        <option value="replicate:nano-banana" class="image-to-image-only d-none">
+                                                                            Replicate - Nano Banana (Image to Image)
+                                                                        </option>
                                                                     </select>
                                                                 </div>
                                                             </div>
@@ -282,5 +325,52 @@
         <script src="{{ asset('assets/vendor/libs/aos/aos.min.js') }}"></script>
         <script src="{{ asset('assets/vendor/libs/jquery/jquery.lazy.min.js') }}"></script>
         <script src="{{ asset('assets/vendor/libs/clipboard/clipboard.min.js') }}"></script>
+    @endpush
+    
+    {{-- JavaScript for Image-to-Image mode toggle and form handling --}}
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const imageToImageCheckbox = document.getElementById('imageToImageMode');
+                const imageUploadSection = document.getElementById('imageUploadSection');
+                const modelEngineSelect = document.getElementById('modelEngine');
+                const regularEngines = modelEngineSelect.querySelectorAll('option:not(.image-to-image-only)');
+                const nanoBananaOption = modelEngineSelect.querySelector('option[value="replicate:nano-banana"]');
+                const form = document.getElementById('generator');
+                
+                // Handle image-to-image mode toggle
+                imageToImageCheckbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        // Show image upload section
+                        imageUploadSection.classList.remove('d-none');
+                        
+                        // Hide regular engines and show only Nano Banana
+                        regularEngines.forEach(option => option.style.display = 'none');
+                        nanoBananaOption.classList.remove('d-none');
+                        nanoBananaOption.selected = true;
+                        
+                        // Update placeholder text
+                        const promptTextarea = document.querySelector('textarea[name="prompt"]');
+                        promptTextarea.placeholder = '{{ lang("Describe how to transform the image...", "images") }}';
+                    } else {
+                        // Hide image upload section
+                        imageUploadSection.classList.add('d-none');
+                        
+                        // Show regular engines and hide Nano Banana
+                        regularEngines.forEach(option => option.style.display = 'block');
+                        nanoBananaOption.classList.add('d-none');
+                        
+                        // Reset to first regular engine
+                        if (regularEngines.length > 0) {
+                            regularEngines[0].selected = true;
+                        }
+                        
+                        // Reset placeholder text
+                        const promptTextarea = document.querySelector('textarea[name="prompt"]');
+                        promptTextarea.placeholder = '{{ lang("What do you want to generate?", "home page") }}';
+                    }
+                });
+            });
+        </script>
     @endpush
 @endsection

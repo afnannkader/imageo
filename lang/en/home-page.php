@@ -35,5 +35,6 @@ return array(
     'read_more' => 'Read More',
     'your_prompt_contains_forbidden_words' => 'Your prompt contains forbidden words',
     'no_active_engines_or_your_plan_does_not_have_any_engines' => 'No active engines, or your plan does not have any engines',
+    'generation_mode' => 'Generation Mode',
 
 );

@@ -21,4 +21,5 @@ return array (
   'generation_failed' => 'Generation failed',
   'output_image' => 'Output Image',
   'input_images' => 'Input Images',
+  'upload_images_to_transform_them_with_ai' => 'Upload images to transform them with AI',
 );

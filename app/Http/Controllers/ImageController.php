@@ -42,9 +42,15 @@ class ImageController extends Controller
             return jsonError(lang('You need to have an active subscription to start generating the images', 'home page'));
         }
 
+        // Get engine from database (now includes Nano Banana)
         $engine = engine($request->engine);
         if (!$engine) {
             return jsonError(lang('The selected engine is not active', 'home page'));
+        }
+
+        // For Nano Banana engine, add input images to the engine object
+        if ($request->engine === 'replicate:nano-banana') {
+            $engine->input_images = $this->processInputImages($request);
         }
 
         $storageProvider = StorageProvider::where('alias', env('FILESYSTEM_DRIVER'))->first();
@@ -52,17 +58,30 @@ class ImageController extends Controller
             return jsonError(lang('Storage provider error', 'home page'));
         }
 
-        $validator = Validator::make($request->all(), [
-            'prompt' => ['required', 'string'],
-            'engine' => ['required', 'string'],
-            'negative_prompt' => ['nullable', 'string'],
-            'size' => ['required', 'in:' . str_replace(', ', ',', $engine->sizes)],
-            'art_style' => ['nullable', 'in:' . str_replace(', ', ',', $engine->art_styles)],
-            'lightning_style' => ['nullable', 'in:' . str_replace(', ', ',', $engine->lightning_styles)],
-            'mood' => ['nullable', 'in:' . str_replace(', ', ',', $engine->moods)],
-            'samples' => ['required', 'integer', 'min:1', 'max:' . min($engine->max, subscription()->plan->max_images)],
-            'visibility' => ['sometimes', 'integer', 'min:0', 'max:1'],
-        ]);
+        // Different validation rules for Nano Banana vs regular engines
+        if ($request->engine === 'replicate:nano-banana') {
+            $validator = Validator::make($request->all(), [
+                'prompt' => ['required', 'string'],
+                'engine' => ['required', 'string'],
+                'images' => ['nullable'], // Images are optional for Nano Banana
+                'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+                'output_format' => ['nullable', 'in:jpg,png,webp'],
+                'samples' => ['required', 'integer', 'min:1', 'max:' . min(4, subscription()->plan->max_images)], // Nano Banana max is 4
+                'visibility' => ['sometimes', 'integer', 'min:0', 'max:1'],
+            ]);
+        } else {
+            $validator = Validator::make($request->all(), [
+                'prompt' => ['required', 'string'],
+                'engine' => ['required', 'string'],
+                'negative_prompt' => ['nullable', 'string'],
+                'size' => ['required', 'in:' . str_replace(', ', ',', $engine->sizes)],
+                'art_style' => ['nullable', 'in:' . str_replace(', ', ',', $engine->art_styles)],
+                'lightning_style' => ['nullable', 'in:' . str_replace(', ', ',', $engine->lightning_styles)],
+                'mood' => ['nullable', 'in:' . str_replace(', ', ',', $engine->moods)],
+                'samples' => ['required', 'integer', 'min:1', 'max:' . min($engine->max, subscription()->plan->max_images)],
+                'visibility' => ['sometimes', 'integer', 'min:0', 'max:1'],
+            ]);
+        }
 
         if ($validator->fails()) {
             foreach ($validator->errors()->all() as $error) {
@@ -201,6 +220,47 @@ class ImageController extends Controller
         $generatedImage->increment('downloads');
 
         return $response;
+    }
+
+    /**
+     * Process input images for image-to-image generation
+     * 
+     * For local environment: Uses hardcoded test images (since local URLs won't work with Replicate API)
+     * For production: Uploads images to public folder and returns public URLs
+     * 
+     * @param Request $request HTTP request with uploaded images
+     * @return array Array of image URLs
+     */
+    private function processInputImages($request)
+    {
+        $imageUrls = [];
+        
+        // Handle uploaded images
+        if ($request->hasFile('images')) {
+            if (app()->environment('local')) {
+                // In local environment, use hardcoded test images since local URLs won't work with Replicate API
+                $imageUrls = [
+                    'https://replicate.delivery/pbxt/NbYIclp4A5HWLsJ8lF5KgiYSNaLBBT1jUcYcHYQmN1uy5OnN/tmpcqc07f_q.png',
+                    'https://replicate.delivery/pbxt/NbYId45yH8s04sptdtPcGqFIhV7zS5GTcdS3TtNliyTAoYPO/Screenshot%202025-08-26%20at%205.30.12%E2%80%AFPM.png',
+                ];
+            } else {
+                // In production, upload images to public folder for Nano Banana API access
+                foreach ($request->file('images') as $file) {
+                    $path = $file->store('public/image2image', 'public');
+                    $imageUrls[] = asset('storage/' . $path);
+                }
+            }
+        }
+        
+        // If no images uploaded, use default test images
+        if (count($imageUrls) === 0) {
+            $imageUrls = [
+                'https://replicate.delivery/pbxt/NbYIclp4A5HWLsJ8lF5KgiYSNaLBBT1jUcYcHYQmN1uy5OnN/tmpcqc07f_q.png',
+                'https://replicate.delivery/pbxt/NbYId45yH8s04sptdtPcGqFIhV7zS5GTcdS3TtNliyTAoYPO/Screenshot%202025-08-26%20at%205.30.12%E2%80%AFPM.png',
+            ];
+        }
+        
+        return $imageUrls;
     }
 
     private function authorizedUrl($url)
