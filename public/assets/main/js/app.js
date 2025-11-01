@@ -270,7 +270,8 @@
                 generatorProcessing = $('.processing');
 
             let defaultImages = $('#default-images'),
-                generatedImages = $('#generated-images'),
+                generatedImages = $('#generated-images-top > .row'), // Target the row inside generated-images-top
+                generatedImagesContainer = $('#generated-images-top'), // Container for showing/hiding
                 viewAllImagesButton = $('#viewAllImagesButton'),
                 faqs = $('#faqs'),
                 blogArticles = $('#blogArticles');
@@ -298,12 +299,17 @@
                         if ($.isEmptyObject(response.error)) {
                             $.each(response.images, function(index, item) {
                                 generatedImages.prepend('<div class="col"> <div class="ai-image"> <img class="lazy" data-src="' + item.src + '" alt="' + item.prompt + '" /> <div class="spinner-border"></div> <div class="ai-image-hover"> <p class="mb-0">' + item.prompt + '</p> <div class="row g-2 alig-items-center"> <div class="col"> <a href="' + item.link + '" target="_blank" class="btn btn-primary btn-md w-100">' + getConfig.translates.viewImage + '</a> </div> <div class="col-auto"> <a href="' + item.download_link + '" class="btn btn-light btn-md px-3"><i class="fas fa-download"></i></a> </div> </div> </div> </div> </div>');
-                                generatedImages.removeClass('d-none');
-                                lazyLoad();
                             });
+                            // Show generated images container above the form
+                            generatedImagesContainer.removeClass('d-none');
+                            lazyLoad();
+                            // Smooth scroll to the generated images section
+                            $('html, body').animate({
+                                scrollTop: generatedImagesContainer.offset().top - 100
+                            }, 500);
                         } else {
                             onAjaxStop();
-                            generatedImages.addClass('d-none');
+                            generatedImagesContainer.addClass('d-none');
                             defaultImages.removeClass('d-none');
                             viewAllImagesButton.removeClass('d-none');
                             toastr.error(response.error);
@@ -311,7 +317,7 @@
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
                         onAjaxStop();
-                        generatedImages.addClass('d-none');
+                        generatedImagesContainer.addClass('d-none');
                         defaultImages.removeClass('d-none');
                         viewAllImagesButton.removeClass('d-none');
                         toastr.error(errorThrown);

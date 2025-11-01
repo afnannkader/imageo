@@ -170,7 +170,8 @@ class ImageController extends Controller
                     }
 
                     $images[$key]['prompt'] = $generatedImage->prompt;
-                    $images[$key]['src'] = $generatedImage->getThumbnailLink();
+                    // Use main image for better quality in preview, fallback to thumbnail if needed
+                    $images[$key]['src'] = $generatedImage->getMainImageLink();
                     $images[$key]['link'] = route('images.show', hashid($generatedImage->id));
                     $images[$key]['download_link'] = route('images.download', [hashid($generatedImage->id), $generatedImage->getMainImageName()]);
                 }

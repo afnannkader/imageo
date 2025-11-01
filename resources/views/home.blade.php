@@ -15,6 +15,12 @@
                         </div>
                         @if (subscription())
                             @if (subscription()->is_subscribed)
+                                {{-- Generated Images Section (Above Form) --}}
+                                <div id="generated-images-top" class="mt-4 mb-4 d-none">
+                                    <div class="row justify-content-center row-cols-1 row-cols-md-2 row-cols-lg-2 row-cols-xxl-3 g-3">
+                                    </div>
+                                </div>
+                                
                                 <form id="generator" action="{{ route('images.generator') }}" method="POST" enctype="multipart/form-data">
                                     <div class="card-v mt-5">
                                         <div class="generator-search v2">
@@ -85,6 +91,7 @@
                                                                     </label>
                                                                 </div>
                                                                 <div class="col">
+                                                                    {{-- Engine dropdown (hidden when image-to-image mode is active) --}}
                                                                     <select id="modelEngine" name="engine"
                                                                         class="form-select form-select-md w-100">
                                                                         @foreach ($engines as $engine)
@@ -113,6 +120,13 @@
                                                                             Replicate - Nano Banana (Image to Image)
                                                                         </option>
                                                                     </select>
+                                                                    {{-- Engine label (shown when image-to-image mode is active) --}}
+                                                                    <div id="engineLabel" class="d-none form-control form-select-md" style="padding: 0.375rem 0.75rem; background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 0.375rem; line-height: 1.5; color: #495057;">
+                                                                        <strong>Replicate - Nano Banana</strong>
+                                                                        <small class="text-muted d-block mt-1">Image to Image Engine</small>
+                                                                    </div>
+                                                                    {{-- Hidden input to maintain engine value when using label --}}
+                                                                    <input type="hidden" id="engineHiddenInput" name="engine" value="">
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -263,9 +277,11 @@
             <div class="container">
                 <div class="section-inner">
                     <div class="section-body">
+                        {{-- Newly generated images appear at the top --}}
                         <div id="generated-images"
                             class="row justify-content-center row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xxl-4 g-3 d-none">
                         </div>
+                        {{-- Existing images from database appear below --}}
                         <div id="default-images"
                             class="row justify-content-center row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xxl-4 g-3">
                             @foreach ($generatedImages as $generatedImage)
@@ -338,16 +354,22 @@
                 const nanoBananaOption = modelEngineSelect.querySelector('option[value="replicate:nano-banana"]');
                 const form = document.getElementById('generator');
                 
+                // Get references to engine label and hidden input
+                const engineLabel = document.getElementById('engineLabel');
+                const engineHiddenInput = document.getElementById('engineHiddenInput');
+                
                 // Handle image-to-image mode toggle
                 imageToImageCheckbox.addEventListener('change', function() {
                     if (this.checked) {
                         // Show image upload section
                         imageUploadSection.classList.remove('d-none');
                         
-                        // Hide regular engines and show only Nano Banana
-                        regularEngines.forEach(option => option.style.display = 'none');
-                        nanoBananaOption.classList.remove('d-none');
-                        nanoBananaOption.selected = true;
+                        // Hide dropdown and show label
+                        modelEngineSelect.classList.add('d-none');
+                        engineLabel.classList.remove('d-none');
+                        engineHiddenInput.value = 'replicate:nano-banana';
+                        engineHiddenInput.name = 'engine'; // Ensure form uses this value
+                        modelEngineSelect.name = ''; // Disable select from form
                         
                         // Update placeholder text
                         const promptTextarea = document.querySelector('textarea[name="prompt"]');
@@ -356,9 +378,12 @@
                         // Hide image upload section
                         imageUploadSection.classList.add('d-none');
                         
-                        // Show regular engines and hide Nano Banana
-                        regularEngines.forEach(option => option.style.display = 'block');
-                        nanoBananaOption.classList.add('d-none');
+                        // Show dropdown and hide label
+                        modelEngineSelect.classList.remove('d-none');
+                        engineLabel.classList.add('d-none');
+                        engineHiddenInput.value = '';
+                        engineHiddenInput.name = ''; // Disable hidden input
+                        modelEngineSelect.name = 'engine'; // Re-enable select
                         
                         // Reset to first regular engine
                         if (regularEngines.length > 0) {
